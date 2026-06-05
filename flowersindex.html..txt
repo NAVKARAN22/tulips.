@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Bouquet of Tulips</title>
+  <!-- Import Three.js library for 3D rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #0f051d;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .bouquet-container {
+      width: 100%;
+      max-width: 800px;
+      height: 580px;
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #1a0a2e 0%, #2d1b5e 40%, #1a3a1a 100%);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    #c {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .title-overlay {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: Georgia, serif;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="bouquet-container">
+  <canvas id="c"></canvas>
+  <div class="title-overlay">Bouquet of Tulips</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const container = canvas.parentElement;
+let w = container.offsetWidth;
+let h = 580;
+
+// Set up renderer with high pixel density support
+canvas.width = w * devicePixelRatio; 
+canvas.height = h * devicePixelRatio;
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(w, h);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
+camera.position.set(0, 2, 9);
+camera.lookAt(0, 1, 0);
+
+// Lighting setup
+const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfffbe6, 1.8);
+sun.position.set(4, 8, 5);
+sun.castShadow = true;
+sun.shadow.mapSize.width = 1024;
+sun.shadow.mapSize.height = 1024;
+scene.add(sun);
+
+const fill = new THREE.PointLight(0x8866ff, 0.8, 20);
+fill.position.set(-4, 3, 2);
+scene.add(fill);
+
+const rim = new THREE.PointLight(0x44aaff, 0.5, 20);
+rim.position.set(0, 5, -4);
+scene.add(rim);
+
+// Ground plane / table surface
+const groundGeo = new THREE.PlaneGeometry(20, 20);
+const groundMat = new THREE.MeshLambertMaterial({color: 0x1a3a1a});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -1.8;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Helper function to create individual unique tulips
+function makeTulip(x, z, rotY, color, petalAccent, height, bloomAngle) {
+  const group = new THREE.Group();
+  group.position.set(x, -1.8, z);
+  group.rotation.y = rotY;
+
+  // Stem
+  const stemGeo = new THREE.CylinderGeometry(0.04, 0.06, height, 8);
+  const stemMat = new THREE.MeshLambertMaterial({color: 0x2d6a2d});
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.y = height / 2;
+  stem.castShadow = true;
+  group.add(stem);
+
+  // Leaf 1
+  const leafShape = new THREE.Shape();
+  leafShape.moveTo(0, 0);
+  leafShape.quadraticCurveTo(0.3, 0.5, 0.1, 1.2);
+  leafShape.quadraticCurveTo(0, 1.0, -0.1, 1.2);
+  leafShape.quadraticCurveTo(-0.2, 0.5, 0, 0);
+  const leafGeo = new THREE.ShapeGeometry(leafShape);
+  const leafMat = new THREE.MeshLambertMaterial({color: 0x3a8040, side: THREE.DoubleSide});
+  const leaf = new THREE.Mesh(leafGeo, leafMat);
+  leaf.position.set(0.12, height * 0.35, 0);
+  leaf.rotation.z = 0.4;
+  leaf.rotation.y = Math.random() * Math.PI;
+  group.add(leaf);
+
+  // Leaf 2
+  const leaf2 = leaf.clone();
+  leaf2.position.set(-0.15, height * 0.55, 0.05);
+  leaf2.rotation.z = -0.35;
+  leaf2.rotation.y = Math.random() * Math.PI;
+  group.add(leaf2);
+
+  // Bloom group at top of stem
+  const bloomGroup = new THREE.Group();
+  bloomGroup.position.y = height;
+  group.add(bloomGroup);
+
+  // Constructing flower out of 6 overlapping petals
+  const petalCount = 6;
+  for (let i = 0; i < petalCount; i++) {
+    const angle = (i / petalCount) * Math.PI * 2;
+    const petalShape = new THREE.Shape();
+    petalShape.moveTo(0, 0);
+    petalShape.bezierCurveTo(-0.18, 0.2, -0.22, 0.6, 0, 0.9);
+    petalShape.bezierCurveTo(0.22, 0.6, 0.18, 0.2, 0, 0);
+    const petalGeo = new THREE.ShapeGeometry(petalShape, 12);
+
+    const col = i % 2 === 0 ? color : petalAccent;
+    const petalMat = new THREE.MeshLambertMaterial({color: col, side: THREE.DoubleSide});
+    const petal = new THREE.Mesh(petalGeo, petalMat);
+
+    petal.rotation.y = angle;
+    petal.rotation.x = bloomAngle; 
+    petal.castShadow = true;
+    bloomGroup.add(petal);
+  }
+
+  // Yellow center stamen
+  const stamenGeo = new THREE.SphereGeometry(0.07, 8, 8);
+  const stamenMat = new THREE.MeshLambertMaterial({color: 0xffe066});
+  const stamen = new THREE.Mesh(stamenGeo, stamenMat);
+  bloomGroup.add(stamen);
+
+  // Organic random slight tilts
+  group.rotation.z = (Math.random() - 0.5) * 0.12;
+  group.rotation.x = (Math.random() - 0.5) * 0.08;
+
+  scene.add(group);
+  return group;
+}
+
+// Tulip color palette pairs
+const tulipPalettes = [
+  [0xff2255, 0xff6688], [0xff8800, 0xffcc44], [0xcc44ff, 0xff88ee],
+  [0xffee22, 0xffcc00], [0xff4499, 0xff77bb], [0xffffff, 0xffddee],
+  [0xff5533, 0xffaa44], [0x6644ff, 0xaa88ff], [0xff1166, 0xff88aa],
+  [0xffbb00, 0xff8800], [0xee55ff, 0xaa22cc], [0xffffff, 0xffeeaa],
+];
+
+const tulips = [];
+// Bouquet coordinate configuration array: [x, y, z, rotY, height, bloomAngle]
+const positions = [
+  [0, 0, 0, Math.PI*0.1, 3.5, 0.35],
+  [-0.5, 0.3, 0.3, Math.PI*0.9, 3.8, 0.3],
+  [0.5, -0.2, 0.4, Math.PI*1.7, 3.6, 0.32],
+  [-0.8, 0.1, -0.2, Math.PI*0.5, 4.0, 0.28],
+  [0.7, 0.3, -0.3, Math.PI*1.3, 3.7, 0.33],
+  [0, 0.6, 0.2, Math.PI*1.1, 3.2, 0.38],
+  [-0.3, -0.4, 0.5, Math.PI*0.2, 3.9, 0.29],
+  [0.3, 0.5, -0.5, Math.PI*1.8, 3.4, 0.36],
+  [-1.1, 0.2, 0.4, Math.PI*0.7, 3.1, 0.42],
+  [1.1, -0.1, 0.1, Math.PI*1.5, 3.3, 0.31],
+  [-0.6, 0.7, -0.4, Math.PI*0.3, 2.9, 0.45],
+  [0.6, -0.5, 0.6, Math.PI*1.9, 3.0, 0.4],
+];
+
+positions.forEach(([x, _, z, rotY, h, bloom], i) => {
+  const [c1, c2] = tulipPalettes[i % tulipPalettes.length];
+  const t = makeTulip(x, z, rotY, c1, c2, h, bloom);
+  tulips.push(t);
+});
+
+// Wrapping pink ribbon around the bouquet stems
+const ribbonGeo = new THREE.TorusGeometry(0.75, 0.06, 8, 32, Math.PI * 1.4);
+const ribbonMat = new THREE.MeshLambertMaterial({color: 0xcc2266});
+const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
+ribbon.position.set(0, -0.5, 0);
+ribbon.rotation.x = Math.PI * 0.2;
+ribbon.rotation.y = Math.PI * 0.1;
+scene.add(ribbon);
+
+const bowGeo = new THREE.TorusGeometry(0.18, 0.05, 6, 16);
+const bow1 = new THREE.Mesh(bowGeo, ribbonMat);
+bow1.position.set(-0.35, -0.65, 0.6);
+bow1.rotation.set(0.5, 0.3, 0.8);
+scene.add(bow1);
+
+const bow2 = new THREE.Mesh(bowGeo, ribbonMat);
+bow2.position.set(0.35, -0.7, 0.55);
+bow2.rotation.set(-0.4, -0.2, 0.5);
+scene.add(bow2);
+
+// Ambient floating magical sparkle particles
+const sparkleMat = new THREE.PointsMaterial({color: 0xffffaa, size: 0.04, transparent: true, opacity: 0.7});
+const sparkleGeo = new THREE.BufferGeometry();
+const sp = [];
+for (let i = 0; i < 120; i++) {
+  sp.push((Math.random() - 0.5) * 5, Math.random() * 5 - 1, (Math.random() - 0.5) * 4);
+}
+sparkleGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+const sparkles = new THREE.Points(sparkleGeo, sparkleMat);
+scene.add(sparkles);
+
+// Tracking mouse position for real-time parallax physics
+let mouseX = 0, mouseY = 0;
+window.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouseX = ((e.clientX - r.left) / r.width - 0.5) * 2;
+  mouseY = -((e.clientY - r.top) / r.height - 0.5) * 2;
+});
+
+// Window resize optimization handling
+window.addEventListener('resize', () => {
+  w = container.offsetWidth;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+});
+
+let clockTicks = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  clockTicks += 0.012;
+
+  // Gentle procedural camera sway linked with interactive mouse movement
+  camera.position.x = Math.sin(clockTicks * 0.3) * 0.8 + mouseX * 0.6;
+  camera.position.y = 2 + Math.sin(clockTicks * 0.2) * 0.3 + mouseY * 0.3;
+  camera.position.z = 9 + Math.sin(clockTicks * 0.15) * 0.5;
+  camera.lookAt(0, 1, 0);
+
+  // Subtle wind simulation sway on flower stalks
+  tulips.forEach((tul, i) => {
+    tul.rotation.z += Math.sin(clockTicks + i * 0.7) * 0.0005;
+  });
+
+  // Twinkling effect updates for background particles
+  sparkles.rotation.y = clockTicks * 0.05;
+  sparkleMat.opacity = 0.4 + Math.sin(clockTicks * 1.5) * 0.3;
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+
+</body>
+</html>
